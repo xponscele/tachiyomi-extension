@@ -141,13 +141,14 @@ class Tachidesk : ConfigurableSource, UnmeteredSource, HttpSource() {
         )
     }
 
-    override val client: OkHttpClient =
+    override val client: OkHttpClient by lazy {
         network.client.newBuilder()
             .dns(Dns.SYSTEM) // don't use DNS over HTTPS as it breaks IP addressing
             .callTimeout(2, TimeUnit.MINUTES)
             .addInterceptor(OkAuthorizationInterceptor(tokenManager))
             .configureMtls(MtlsPreference.getConfig(preferences))
             .build()
+    }
 
     override fun headersBuilder(): Headers.Builder = Headers.Builder().apply {
         tokenManager.value.getHeaders().forEach {
