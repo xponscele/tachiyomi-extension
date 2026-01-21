@@ -20,6 +20,8 @@ import eu.kanade.tachiyomi.extension.all.tachidesk.apollo.GetMangaDataQuery
 import eu.kanade.tachiyomi.extension.all.tachidesk.apollo.GetMangaMutation
 import eu.kanade.tachiyomi.extension.all.tachidesk.apollo.GetPagesMutation
 import eu.kanade.tachiyomi.extension.all.tachidesk.apollo.SearchMangaQuery
+import eu.kanade.tachiyomi.lib.mtls.MtlsHelper.configureMtls
+import eu.kanade.tachiyomi.lib.mtls.MtlsPreference
 import eu.kanade.tachiyomi.extension.all.tachidesk.apollo.fragment.CategoryFragment
 import eu.kanade.tachiyomi.extension.all.tachidesk.apollo.fragment.ChapterFragment
 import eu.kanade.tachiyomi.extension.all.tachidesk.apollo.fragment.MangaFragment
@@ -134,6 +136,7 @@ class Tachidesk : ConfigurableSource, UnmeteredSource, HttpSource() {
             network.client.newBuilder()
                 .dns(Dns.SYSTEM) // don't use DNS over HTTPS as it breaks IP addressing
                 .callTimeout(2, TimeUnit.MINUTES)
+                .configureMtls(MtlsPreference.getConfig(preferences))
                 .build(),
         )
     }
@@ -143,6 +146,7 @@ class Tachidesk : ConfigurableSource, UnmeteredSource, HttpSource() {
             .dns(Dns.SYSTEM) // don't use DNS over HTTPS as it breaks IP addressing
             .callTimeout(2, TimeUnit.MINUTES)
             .addInterceptor(OkAuthorizationInterceptor(tokenManager))
+            .configureMtls(MtlsPreference.getConfig(preferences))
             .build()
 
     override fun headersBuilder(): Headers.Builder = Headers.Builder().apply {
@@ -746,6 +750,9 @@ class Tachidesk : ConfigurableSource, UnmeteredSource, HttpSource() {
         screen.addPreference(screen.editTextPreference(PASSWORD_TITLE, PASSWORD_DEFAULT, basePassword, true, "", PASSWORD_KEY))
         screen.addPreference(screen.checkBoxPreference(TRACKER_DELETE_TITLE, TRACKER_DELETE_DEFAULT, "", TRACKER_DELETE_KEY))
         screen.addPreference(screen.checkBoxPreference(FETCH_DATA_FROM_SOURCE_TITLE, FETCH_DATA_FROM_SOURCE_DEFAULT, "", FETCH_DATA_FROM_SOURCE_TITLE))
+
+        // mTLS Settings
+        MtlsPreference.addPreferences(screen)
     }
 
     /** boilerplate for [EditTextPreference] */
