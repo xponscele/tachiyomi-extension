@@ -27,6 +27,8 @@ import eu.kanade.tachiyomi.extension.all.tachidesk.apollo.type.IntFilterInput
 import eu.kanade.tachiyomi.extension.all.tachidesk.apollo.type.MangaFilterInput
 import eu.kanade.tachiyomi.extension.all.tachidesk.apollo.type.MangaStatus
 import eu.kanade.tachiyomi.extension.all.tachidesk.apollo.type.StringFilterInput
+import eu.kanade.tachiyomi.lib.mtls.MtlsHelper.configureMtls
+import eu.kanade.tachiyomi.lib.mtls.MtlsPreference
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.UnmeteredSource
@@ -134,16 +136,19 @@ class Tachidesk : ConfigurableSource, UnmeteredSource, HttpSource() {
             network.client.newBuilder()
                 .dns(Dns.SYSTEM) // don't use DNS over HTTPS as it breaks IP addressing
                 .callTimeout(2, TimeUnit.MINUTES)
+                .configureMtls(MtlsPreference.getConfig(preferences, getCertificateFile()))
                 .build(),
         )
     }
 
-    override val client: OkHttpClient =
+    override val client: OkHttpClient by lazy {
         network.client.newBuilder()
             .dns(Dns.SYSTEM) // don't use DNS over HTTPS as it breaks IP addressing
             .callTimeout(2, TimeUnit.MINUTES)
             .addInterceptor(OkAuthorizationInterceptor(tokenManager))
+            .configureMtls(MtlsPreference.getConfig(preferences, getCertificateFile()))
             .build()
+    }
 
     override fun headersBuilder(): Headers.Builder = Headers.Builder().apply {
         tokenManager.value.getHeaders().forEach {
@@ -746,6 +751,9 @@ class Tachidesk : ConfigurableSource, UnmeteredSource, HttpSource() {
         screen.addPreference(screen.editTextPreference(PASSWORD_TITLE, PASSWORD_DEFAULT, basePassword, true, "", PASSWORD_KEY))
         screen.addPreference(screen.checkBoxPreference(TRACKER_DELETE_TITLE, TRACKER_DELETE_DEFAULT, "", TRACKER_DELETE_KEY))
         screen.addPreference(screen.checkBoxPreference(FETCH_DATA_FROM_SOURCE_TITLE, FETCH_DATA_FROM_SOURCE_DEFAULT, "", FETCH_DATA_FROM_SOURCE_TITLE))
+
+        // mTLS Settings
+        MtlsPreference.addPreferences(screen)
     }
 
     /** boilerplate for [EditTextPreference] */
@@ -853,6 +861,27 @@ class Tachidesk : ConfigurableSource, UnmeteredSource, HttpSource() {
         private const val FETCH_DATA_FROM_SOURCE_DEFAULT = true
 
         private const val TAG = "Tachidesk"
+    }
+
+    /**
+     * Helper function to get mTLS certificate file from preferences
+     */
+    private fun getCertificateFile(): java.io.File? {
+        val filename = preferences.getString("mtls_cert_filename", "") ?: ""
+        Log.i(TAG, "getCertificateFile: filename='$filename'")
+
+        if (filename.isEmpty()) {
+            Log.w(TAG, "getCertificateFile: filename is empty")
+            return null
+        }
+
+        // Use extension's external storage directory
+        val extDir = java.io.File("/storage/emulated/0/Android/data/eu.kanade.tachiyomi.extension.all.tachidesk/files/certificates")
+        val certFile = java.io.File(extDir, filename)
+
+        Log.i(TAG, "getCertificateFile: certFile=${certFile.absolutePath}, exists=${certFile.exists()}")
+
+        return if (certFile.exists()) certFile else null
     }
 
     // ------------- Not Used -------------
