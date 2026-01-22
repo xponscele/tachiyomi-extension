@@ -1,9 +1,11 @@
 package eu.kanade.tachiyomi.lib.mtls
 
 import android.content.SharedPreferences
-import androidx.preference.CheckBoxPreference
+import android.text.InputType
 import androidx.preference.EditTextPreference
 import androidx.preference.PreferenceScreen
+import androidx.preference.SwitchPreferenceCompat
+import java.io.File
 
 /**
  * Helper class to add mTLS preference UI to extension settings
@@ -11,17 +13,17 @@ import androidx.preference.PreferenceScreen
 object MtlsPreference {
 
     private const val PREF_MTLS_ENABLED = "mtls_enabled"
-    private const val PREF_MTLS_CLIENT_CERT = "mtls_client_cert"
-    private const val PREF_MTLS_CLIENT_KEY = "mtls_client_key"
+    private const val PREF_MTLS_CERT_BASE64 = "mtls_cert_base64"
+    private const val PREF_MTLS_CERT_FILENAME = "mtls_cert_filename"
     private const val PREF_MTLS_CERT_PASSWORD = "mtls_cert_password"
-    private const val PREF_MTLS_CA_CERT = "mtls_ca_cert"
 
     /**
      * Adds mTLS preferences to the preference screen
      */
     fun addPreferences(screen: PreferenceScreen) {
+        // Main mTLS toggle
         screen.addPreference(
-            CheckBoxPreference(screen.context).apply {
+            SwitchPreferenceCompat(screen.context).apply {
                 key = PREF_MTLS_ENABLED
                 title = "Enable mTLS"
                 summary = "Enable mutual TLS authentication with client certificates"
@@ -29,56 +31,51 @@ object MtlsPreference {
             }
         )
 
+        // Certificate (base64)
         screen.addPreference(
             EditTextPreference(screen.context).apply {
-                key = PREF_MTLS_CLIENT_CERT
-                title = "Client Certificate"
-                summary = "Path to PKCS12 (.p12/.pfx) file or base64 encoded certificate"
+                key = PREF_MTLS_CERT_BASE64
+                title = "Certificate (Base64)"
+                summary = "Paste your PKCS12 certificate encoded in Base64"
                 setDefaultValue("")
-                dialogTitle = "Client Certificate"
-                dialogMessage = "Enter the path to your client certificate file (PKCS12 format) or base64 encoded data"
+                dialogTitle = "Certificate (Base64)"
+                dialogMessage = "Paste your client certificate (.p12/.pfx) encoded in Base64\n\nTo encode: base64 -w 0 client.p12"
             }
         )
 
+        // Certificate password
         screen.addPreference(
             EditTextPreference(screen.context).apply {
                 key = PREF_MTLS_CERT_PASSWORD
-                title = "Certificate Password"
-                summary = "Password for the client certificate (if encrypted)"
+                title = "Certificate password"
+                summary = "Password for the certificate (leave empty if no password)"
                 setDefaultValue("")
-                dialogTitle = "Certificate Password"
-                dialogMessage = "Enter the password to decrypt the client certificate"
+                dialogTitle = "Certificate password"
+                dialogMessage = "Enter the password for your certificate (if required)"
 
                 // Make it a password field
                 setOnBindEditTextListener { editText ->
-                    editText.inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                            android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                    editText.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
                 }
-            }
-        )
-
-        screen.addPreference(
-            EditTextPreference(screen.context).apply {
-                key = PREF_MTLS_CA_CERT
-                title = "CA Certificate (Optional)"
-                summary = "Path to custom CA certificate for server verification or base64 encoded certificate"
-                setDefaultValue("")
-                dialogTitle = "CA Certificate"
-                dialogMessage = "Enter the path to a custom CA certificate file or base64 encoded data (optional)"
             }
         )
     }
 
     /**
      * Retrieves mTLS configuration from SharedPreferences
+     * The certificateFile parameter should be created by the extension using Context
      */
-    fun getConfig(preferences: SharedPreferences): MtlsConfig {
+    fun getConfig(preferences: SharedPreferences, certificateFile: File?): MtlsConfig {
+        val enabled = preferences.getBoolean(PREF_MTLS_ENABLED, false)
+        val base64 = preferences.getString(PREF_MTLS_CERT_BASE64, "") ?: ""
+        val password = preferences.getString(PREF_MTLS_CERT_PASSWORD, "") ?: ""
+
         return MtlsConfig(
-            enabled = preferences.getBoolean(PREF_MTLS_ENABLED, false),
-            clientCertificate = preferences.getString(PREF_MTLS_CLIENT_CERT, "") ?: "",
-            clientKey = preferences.getString(PREF_MTLS_CLIENT_KEY, "") ?: "",
-            certificatePassword = preferences.getString(PREF_MTLS_CERT_PASSWORD, "") ?: "",
-            caCertificate = preferences.getString(PREF_MTLS_CA_CERT, "") ?: "",
+            enabled = enabled,
+            certificateFile = if (enabled && base64.isEmpty()) certificateFile else null,
+            certificateBase64 = base64,
+            certificatePassword = password,
+            caCertificate = "", // Not yet implemented
         )
     }
 }
